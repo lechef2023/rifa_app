@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Button } from 'react-bootstrap';
 import { firestore } from './firebase';
 
@@ -18,6 +18,29 @@ function MyForm() {
       return { numero: index, seleccionado: false };
     })
   );
+
+  useEffect(() => {
+    // Consultar la base de datos para obtener números previamente seleccionados
+    const fetchSelectedNumbers = async () => {
+      try {
+        const snapshot = await firestore.collection('formData').get();
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const selectedNumbers = data.numerosSeleccionados;
+          const nuevosNumerosDisponibles = [...numerosDisponibles];
+          selectedNumbers.forEach((numero) => {
+            if (numero < nuevosNumerosDisponibles.length) {
+              nuevosNumerosDisponibles[numero].seleccionado = true;
+            }
+          });
+          setNumerosDisponibles(nuevosNumerosDisponibles);
+        });
+      } catch (error) {
+        console.error('Error al consultar la base de datos: ', error);
+      }
+    };
+    fetchSelectedNumbers();
+  }, [numerosDisponibles]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -49,17 +72,22 @@ function MyForm() {
     e.preventDefault();
 
     try {
+      // Guardar los datos en la base de datos
       const docRef = await firestore.collection('formData').add(formData);
-      console.log('Documento guardado con ID: ', docRef.id);
+
+      // Marcar números seleccionados como inactivos en la base de datos
+      const selectedNumbers = formData.numerosSeleccionados;
+      const nuevosNumerosDisponibles = [...numerosDisponibles];
+      selectedNumbers.forEach((numero) => {
+        nuevosNumerosDisponibles[numero].seleccionado = true;
+      });
+
+      // Actualizar la lista de números seleccionados
+      setNumerosDisponibles(nuevosNumerosDisponibles);
 
       // Reiniciar el formulario
       e.target.reset();
       setFormData({ ...formData, numerosSeleccionados: [] });
-      setNumerosDisponibles(
-        Array.from({ length: 1000 }, (_, index) => {
-          return { numero: index, seleccionado: false };
-        })
-      );
     } catch (error) {
       console.error('Error al guardar el documento: ', error);
     }
